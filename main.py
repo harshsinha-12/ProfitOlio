@@ -61,8 +61,8 @@ def register_user(username, password):
 
 # Function to check if the user exists
 def check_user(username, password):
-    dummy_username = "demo_user"
-    dummy_password = "demo_pass"
+    dummy_username = "harsh"
+    dummy_password = "123"
 
     # Check if the provided credentials are the dummy ones
     if username == dummy_username and password == dummy_password:
@@ -525,8 +525,8 @@ elif choice == "Logout":
             st.info("You have been logged out.")
 
 elif choice == "Login":
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type='password')
+    username = st.sidebar.text_input("Username, use 'harsh' for demo", value='harsh')
+    password = st.sidebar.text_input("Password, use '123' for demo", value = '123', type='password')
     if st.sidebar.button("Login"):
         if check_user(username, password):
             st.success(f"Logged In as {username}")
