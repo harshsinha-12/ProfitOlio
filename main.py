@@ -61,9 +61,43 @@ def register_user(username, password):
 
 # Function to check if the user exists
 def check_user(username, password):
+    dummy_username = "demo_user"
+    dummy_password = "demo_pass"
+
+    # Check if the provided credentials are the dummy ones
+    if username == dummy_username and password == dummy_password:
+        return True  # Assume dummy user is always valid for demo purposes
+
+    # Hash the password for regular login check
     hashed_pw = hash_password(password)
     c.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, hashed_pw))
     return c.fetchone() is not None
+
+# Populate dummy data for demonstration
+def populate_dummy_data():
+    # Check if dummy user already exists to avoid duplicates
+    c.execute('SELECT * FROM users WHERE username = "demo_user"')
+    if c.fetchone() is None:
+        # Hash the dummy password
+        hashed_pw = hash_password("demo_pass")
+        # Insert dummy user
+        c.execute('INSERT INTO users (username, password) VALUES (?, ?)', ("demo_user", hashed_pw))
+        # Insert dummy portfolio data linked to dummy user
+        dummy_user_id = get_user_id("demo_user")
+        c.execute('''
+            INSERT INTO portfolio (user_id, stock_symbol, currency, quantity, average_purchase_price, 
+            date_of_purchase, current_price, current_value, amount_invested, profit_loss, profit_loss_percent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (dummy_user_id, 'AAPL', 'USD', 10, 150.0, '2021-01-01', 170.0, 1700.0, 1500.0, 200.0, 13.33))
+        conn.commit()
+
+# Call this function after creating tables
+populate_dummy_data()
+
+
+    # hashed_pw = hash_password(password)
+    # c.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, hashed_pw))
+    # return c.fetchone() is not None
 
 # Function to get the user ID
 def get_user_id(username):
