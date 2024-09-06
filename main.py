@@ -491,8 +491,8 @@ elif choice == "Logout":
             st.info("You have been logged out.")
 
 elif choice == "Login":
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type='password')
+    username = st.sidebar.text_input("Username, use 'harsh' for demo", value='harsh')
+    password = st.sidebar.text_input("Password, use '123' for demo", type='password')
     if st.sidebar.button("Login"):
         if check_user(username, password):
             st.success(f"Logged In as {username}")
@@ -500,6 +500,26 @@ elif choice == "Login":
             st.session_state['user_id'] = user_id
         else:
             st.warning("Incorrect Username/Password")
+        if username == "harsh" and password == "123":
+            hashed_pw = hash_password(password)
+            c.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, hashed_pw))
+            #return c.fetchone() is not None
+            c.execute('SELECT * FROM users WHERE username = "harsh" AND password = "123"')
+    if c.fetchone() is None:
+        # Hash the dummy password
+        hashed_pw = hash_password("123")
+        # Insert dummy user
+        c.execute('INSERT INTO users (username, password) VALUES (?, ?)', ("demo_user", hashed_pw))
+        # Insert dummy portfolio data linked to dummy user
+        dummy_user_id = get_user_id("harsh")
+        c.execute('''
+            INSERT INTO portfolio (user_id, stock_symbol, currency, quantity, average_purchase_price, 
+            date_of_purchase, current_price, current_value, amount_invested, profit_loss, profit_loss_percent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (dummy_user_id, 'AAPL', 'USD', 10, 150.0, '2021-01-01', 170.0, 1700.0, 1500.0, 200.0, 13.33))
+        conn.commit()
+        st.success("Logged In as Harsh")
+        st.balloons()
 
 elif choice == "About":
     """
