@@ -73,41 +73,70 @@ def get_user_id(username):
 
 def home():
     def get_stock_data():
-        try:
-            st.markdown('### Indian Market Monitor')
-            nifty = yf.Ticker("^NSEI")
-            sensex = yf.Ticker("^BSESN")
+        st.markdown('### Indian Market Monitor')
+        nifty = yf.Ticker("^NSEI")
+        sensex = yf.Ticker("^BSESN")
 
-            # Fetch data for the last two days
-            nifty_data = nifty.history(period="2d", interval="5m")
-            sensex_data = sensex.history(period="2d", interval="5m")
+        # Fetch data for the last two days
+        nifty_data = nifty.history(period="1d", interval="5m")
+        sensex_data = sensex.history(period="1d", interval="5m")
+
+        # Check if data is empty
+        if nifty_data.empty:
+            st.error("No data retrieved for Nifty.")
+            # You can choose to return empty DataFrames or handle this case separately
+            nifty_data = pd.DataFrame()
+
+        if sensex_data.empty:
+            st.error("No data retrieved for Sensex.")
+            sensex_data = pd.DataFrame()
+
+        # Proceed only if data is not empty
+        if not nifty_data.empty:
+            # Ensure the index is a DatetimeIndex
+            if not isinstance(nifty_data.index, pd.DatetimeIndex):
+                nifty_data.index = pd.to_datetime(nifty_data.index)
 
             # Adjust timezone
-            nifty_data.index = nifty_data.index.tz_convert('Asia/Kolkata') if nifty_data.index.tzinfo else nifty_data.index.tz_localize('UTC').tz_convert('Asia/Kolkata')
-            sensex_data.index = sensex_data.index.tz_convert('Asia/Kolkata') if sensex_data.index.tzinfo else sensex_data.index.tz_localize('UTC').tz_convert('Asia/Kolkata')
+            if nifty_data.index.tz is None:
+                nifty_data.index = nifty_data.index.tz_localize('UTC').tz_convert('Asia/Kolkata')
+            else:
+                nifty_data.index = nifty_data.index.tz_convert('Asia/Kolkata')
 
-            today = pd.to_datetime('now', utc=True).tz_convert('Asia/Kolkata').normalize()
+            today = pd.Timestamp('now', tz='Asia/Kolkata').normalize()
 
             # Filter data for today or the last available day
             if nifty_data.index.max().normalize() < today:
-                today_data = nifty_data[nifty_data.index.date == (nifty_data.index.max().date())]
+                today_data = nifty_data[nifty_data.index.date == nifty_data.index.max().date()]
             else:
                 today_data = nifty_data[nifty_data.index.date == today.date()]
+        else:
+            today_data = pd.DataFrame()
+
+        if not sensex_data.empty:
+            if not isinstance(sensex_data.index, pd.DatetimeIndex):
+                sensex_data.index = pd.to_datetime(sensex_data.index)
+
+            if sensex_data.index.tz is None:
+                sensex_data.index = sensex_data.index.tz_localize('UTC').tz_convert('Asia/Kolkata')
+            else:
+                sensex_data.index = sensex_data.index.tz_convert('Asia/Kolkata')
 
             if sensex_data.index.max().normalize() < today:
-                sensex_today_data = sensex_data[sensex_data.index.date == (sensex_data.index.max().date())]
+                sensex_today_data = sensex_data[sensex_data.index.date == sensex_data.index.max().date()]
             else:
                 sensex_today_data = sensex_data[sensex_data.index.date == today.date()]
+        else:
+            sensex_today_data = pd.DataFrame()
 
-            return {
-                "nifty_data": today_data,
-                "sensex_data": sensex_today_data,
-                "previous_nifty_close": today_data['Close'].iloc[-2] if len(today_data) > 1 else None,
-                "previous_sensex_close": sensex_today_data['Close'].iloc[-2] if len(sensex_today_data) > 1 else None
-            }
-        except Exception as e:
-            st.error(f"Failed to fetch stock data: {e}")
-            return None
+        # Prepare the return dictionary
+        return {
+            "nifty_data": today_data,
+            "sensex_data": sensex_today_data,
+            "previous_nifty_close": today_data['Close'].iloc[-2] if len(today_data) > 1 else None,
+            "previous_sensex_close": sensex_today_data['Close'].iloc[-2] if len(sensex_today_data) > 1 else None
+        }
+
 
     # Title and Page Config
     #st.set_page_config(page_title="Market Monitor", layout="wide")
@@ -1471,5 +1500,4 @@ if 'user_id' in st.session_state:
                 if __name__ == "__main__":
                         main()
                         
-conn.close() 
-
+conn.close()
