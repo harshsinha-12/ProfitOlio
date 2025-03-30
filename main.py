@@ -336,6 +336,19 @@ def home():
         st.session_state['next_run_time'] = time.time() - 1  # Force refresh
         st.rerun()
 
+def get_adjusted_close(data):
+    # Flatten multi-index columns if necessary.
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+    # Use 'Adj Close' if available, otherwise fall back to 'Close'.
+    if 'Adj Close' in data.columns:
+        return data['Adj Close']
+    elif 'Close' in data.columns:
+        return data['Close']
+    else:
+        st.error("Neither 'Adj Close' nor 'Close' data is available.")
+        return None
+
 def stock_metrics():
     def calculate_beta(asset_returns, market_returns):
         covariance_matrix = np.cov(asset_returns, market_returns)
@@ -371,16 +384,22 @@ def stock_metrics():
         try:
             # Fetch stock data using yfinance
             stock_data = yf.download(stock_symbol, start=start_date, end=end_date)
+            adj_close = get_adjusted_close(stock_data)
+            if adj_close is None:
+                st.stop()  # Stop execution if data is unavailable
+            
             # Calculate daily returns of the stock
-            stock_returns = stock_data['Adj Close'].pct_change().dropna()
+            stock_returns = adj_close.pct_change().dropna()
 
             # Fetch market data (e.g., S&P 500 index or BSE Sensex)
-            if stock_symbol.endswith('.NS'):
-                market_data = yf.download('^BSESN', start=start_date, end=end_date)
-            else:
-                market_data = yf.download('^GSPC', start=start_date, end=end_date)
+            market_ticker = '^BSESN' if stock_symbol.endswith('.NS') else '^GSPC'
+            market_data = yf.download(market_ticker, start=start_date, end=end_date)
+            market_adj_close = get_adjusted_close(market_data)
+            if market_adj_close is None:
+                st.stop()
+
             # Calculate daily returns of the market
-            market_returns = market_data['Adj Close'].pct_change().dropna()
+            market_returns = market_adj_close.pct_change().dropna()
 
             # Align the data by date
             combined_data = pd.merge(stock_returns, market_returns, left_index=True, right_index=True, how='inner')
@@ -392,18 +411,9 @@ def stock_metrics():
             # Display beta
             beta = round(beta, 2)
             beta_pct = round((1 - beta) * 100, 2) if beta < 1 else round((beta - 1) * 100, 2)
-            
-
-            # Plot the returns using Plotly
-            st.write("### Stock Beta")
-            st.write(f"Beta for {stock_symbol} over {timeframe}: {beta} i.e., the stock is {beta_pct}% {'more' if beta > 1 else 'less'} volatile than the market.")
-            fig = px.line(combined_data, x=combined_data.index, y=['Stock_Returns', 'Market_Returns'],
-                        labels={'value': 'Returns', 'index': 'Date'},
-                        title=f"{stock_symbol} vs Market Returns ({timeframe})")
-            st.plotly_chart(fig)
-
+            st.write(f"Beta: {beta}, Beta Percentage: {beta_pct}%")
         except Exception as e:
-            st.write("An error occurred: ", e)
+            st.error(e)
     else:
         st.write("Please enter a valid stock symbol.")
 
@@ -415,28 +425,29 @@ def stock_metrics():
         try:
             # Fetch stock data using yfinance
             stock_data = yf.download(stock_symbol, start=start_date, end=end_date)
+            adj_close = get_adjusted_close(stock_data)
+            if adj_close is None:
+                st.stop()
+            
             # Calculate daily returns of the stock
-            stock_returns = stock_data['Adj Close'].pct_change().dropna()
+            stock_returns = adj_close.pct_change().dropna()
 
             # Calculate VaR
             var_95 = calculate_var(stock_returns, confidence_level=0.05)
             var_99 = calculate_var(stock_returns, confidence_level=0.01)
 
-            var_95_round = round(var_95, 2)
-            var_99_round = round(var_99, 2)
+            # Calculate CAGR
+            cagr = calculate_cagr(adj_close)
 
-            # Plot the returns using Plotly
-            st.write("### Stock VaR")
-            st.write(f"Value at Risk (95% confidence) for {stock_symbol} over the selected timeframe is {var_95_round}, i.e., the stock is expected to lose at most {round(var_95_round * 100 * -1)}% in value over {timeframe} with 95% confidence.")
-            st.write(f"Value at Risk (99% confidence) for {stock_symbol} over the selected timeframe is {var_99_round}, i.e., the stock is expected to lose at most {round(var_99_round * 100 * -1)}% in value over {timeframe} with 99% confidence.")
-            fig = px.line(stock_returns, x=stock_returns.index, y=stock_returns,
-                        labels={'value': 'Returns', 'index': 'Date'},
-                        title=f"{stock_symbol} VaR ({timeframe})")
-            st.plotly_chart(fig)
-            
+            # Calculate Sharpe Ratio
+            sharpe_ratio = calculate_sharpe_ratio(stock_returns)
 
+            # Display Performance Metrics
+            st.header("Performance Tracking")
+            st.write(f"### CAGR for {stock_symbol} over {timeframe}: {cagr:.2%}")
+            st.write(f"### Sharpe Ratio (Risk-adjusted returns) for {stock_symbol} over {timeframe}: {sharpe_ratio:.2f}")
         except Exception as e:
-            st.write("An error occurred: ", e)
+            st.error("An error occurred: " + str(e))
     else:
         st.write("Please enter a valid stock symbol.")
 
@@ -454,15 +465,19 @@ def stock_metrics():
         try:
             # Fetch stock data using yfinance
             stock_data = yf.download(stock_symbol, start=start_date, end=end_date)
+            adj_close = get_adjusted_close(stock_data)
+            if adj_close is None:
+                st.stop()
+            
             # Calculate daily returns of the stock
-            stock_returns = stock_data['Adj Close'].pct_change().dropna()
+            stock_returns = adj_close.pct_change().dropna()
 
             # Calculate VaR
             var_95 = calculate_var(stock_returns, confidence_level=0.05)
             var_99 = calculate_var(stock_returns, confidence_level=0.01)
 
             # Calculate CAGR
-            cagr = calculate_cagr(stock_data['Adj Close'])
+            cagr = calculate_cagr(adj_close)
 
             # Calculate Sharpe Ratio
             sharpe_ratio = calculate_sharpe_ratio(stock_returns)
@@ -470,12 +485,12 @@ def stock_metrics():
             # Display Performance Metrics
             st.header("Performance Tracking")
             st.write(f"### CAGR for {stock_symbol} over {timeframe}: {cagr:.2%}")
-            st.write(f"### Sharpe Ratio i.e. Risk-adjusted returns for {stock_symbol} over {timeframe}: {sharpe_ratio:.2f}")
-
+            st.write(f"### Sharpe Ratio (Risk-adjusted returns) for {stock_symbol} over {timeframe}: {sharpe_ratio:.2f}")
         except Exception as e:
-            st.write("An error occurred: ", e)
+            st.error("An error occurred: " + str(e))
     else:
         st.write("Please enter a valid stock symbol.")
+
 
 # For login sidebar
 st.title('ProfitOlio - Portfolio Management System')
@@ -1302,17 +1317,35 @@ if 'user_id' in st.session_state:
 
                     @st.cache_data
                     def load_data(ticker, custom_today):
-                        data = yf.download(ticker, START, custom_today.strftime("%Y-%m-%d"))
-                        data.reset_index(inplace=True)
-                        return data
+                        try:
+                            data = yf.download(ticker, START, custom_today.strftime("%Y-%m-%d"))
+                            if data.empty:
+                                st.error(f"Failed to fetch data for {ticker}. The ticker might be incorrect or delisted.")
+                                return None
+                            # Flatten multi-index columns if present
+                            if isinstance(data.columns, pd.MultiIndex):
+                                data.columns = data.columns.get_level_values(0)
+                            data.reset_index(inplace=True)
+                            return data
+                        except Exception as e:
+                            st.error(f"Error fetching data for {ticker}: {e}")
+                            return None
 
                     # Load data
                     data_load_state = st.text("Loading data...")
                     data = load_data(selected_stock, custom_today)
+                    if data is None:
+                        st.stop()
                     data_load_state.text("Data Loaded!")
 
-                    df_train = data[['Date', 'Close']]
+                    # Prepare training data
+                    df_train = data[['Date', 'Close']].copy()
                     df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
+                    df_train['ds'] = pd.to_datetime(df_train['ds'], errors='coerce')
+                    df_train['y'] = pd.to_numeric(df_train['y'], errors='coerce')
+                    df_train.dropna(inplace=True)
+
+                    # Forecasting with Prophet
                     m = Prophet()
                     m.fit(df_train)
                     future = m.make_future_dataframe(periods=int(period))
@@ -1325,11 +1358,7 @@ if 'user_id' in st.session_state:
                     col3, col4, col5 = st.columns(3)
                     col3.markdown(f"Predicted Price Range for {last_date.date()}:")
                     col4.metric("Lower Estimate:", f"{last_yhat_lower:.2f}")
-                    col5.metric(" Upper Estimate:", f"{last_yhat_upper:.2f}")
-                    
-                    # st.markdown(f"### Predicted Price Range for {last_date.date()}:")
-                    # st.markdown(f"#### Lower Estimate: ${last_yhat_lower:.2f}")
-                    # st.markdown(f"#### Upper Estimate: ${last_yhat_upper:.2f}")
+                    col5.metric("Upper Estimate:", f"{last_yhat_upper:.2f}")
 
                     # Plotting raw data
                     st.subheader('Raw data')
