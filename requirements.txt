@@ -1,8 +1,8 @@
-streamlit==1.34.0
-yfinance==0.2.36
-pandas==2.2.0
+streamlit==1.38.0
+yfinance==0.2.54
+pandas==2.2.2
 openai==1.17.0
 prophet==1.1.5
-plotly==5.18.0
+plotly==5.23.0
 streamlit-option-menu
-numpy==1.26.3
+numpy<2.0
